@@ -2,3 +2,5 @@ bluepy
 pycrypto
 curses-menu
 flask
+"uvicorn[standard]"
+fastapi
