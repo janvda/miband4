@@ -1,6 +1,6 @@
 bluepy
 pycrypto
 curses-menu
-flask
-"uvicorn[standard]"
+uvicorn[standard]
 fastapi
+paho-mqtt
