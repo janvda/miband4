@@ -5,7 +5,7 @@ class LogConfig(BaseModel):
     """Logging configuration to be set for the server"""
 
     LOGGER_NAME: str = "miband_api"
-    LOG_FORMAT: str = "%(levelprefix)s %(message)s"
+    LOG_FORMAT: str = "%(asctime)s,%(msecs)03d [%(levelname)s] %(message)s"
     LOG_LEVEL: str = "DEBUG"
 
     # Logging config

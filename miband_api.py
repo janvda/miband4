@@ -32,31 +32,7 @@ app = FastAPI()
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
-
-@app.put("/mqtt_broker")
-def connect_mqtt_broker(server: str = "127.0.0.1",port:int = 1883,keepalive:int=60, bind_address:str=""):
-    global mqtt_connected, my_mqtt_client
-
-    def on_connect(client, userdata, flags, rc):
-        global mqtt_connected
-        if rc == 0:
-            mqtt_connected = True
-            logging.info("Connected to MQTT Broker!")
-        else:
-            logging.info("Failed to connect, return code %d\n", rc)
-
-    if mqtt_connected :
-        logging.warning("Already connected to mqtt broker")
-    else:
-        try:
-            my_mqtt_client = mqtt_client.Client(f'miband-service-{random.randint(0, 1000)}')
-            my_mqtt_client.on_connect = on_connect
-            my_mqtt_client.connect(server,port,keepalive,bind_address)
-            my_mqtt_client.loop_start()   
-            return
-        except BaseException as error:
-            raise HTTPException(status_code=400, detail=format(error)) 
+    return {"info": "see miband_api.py"}
 
 @app.post("/connect")
 def connect(mac_address: str,authentication_key:str):
@@ -70,16 +46,20 @@ def connect(mac_address: str,authentication_key:str):
         connected = band.initialize()    
         return connected
     except BaseException as error:
-        raise HTTPException(status_code=400, detail=format(error))
+        error_str = format(error)
+        if "non-hexadecimal number found in fromhex()" in error_str:
+            error_str = "Authentication key has not the format of a hexadecimal number !"
+        logger.error(error_str)
+        raise HTTPException(status_code=400, detail=error_str)
 
 @app.get("/info")
 @return_404_if_not_connected
 def get_info():
     info = { "Soft revision" : band.get_revision(),
-                "Hardware revision" : band.get_hrdw_revision(),
-                "Serial" : band.get_serial(),
-                "Battery" : band.get_battery_info()['level'],
-                "Time" : band.get_current_time()['date'].isoformat()
+             "Hardware revision" : band.get_hrdw_revision(),
+             "Serial" : band.get_serial(),
+             "Battery" : band.get_battery_info()['level'],
+             "Time" : band.get_current_time()['date'].isoformat()
             }
     return info
 
@@ -197,5 +177,8 @@ if __name__ == "__main__":
         exit()
 
     # start app
+    log_config = uvicorn.config.LOGGING_CONFIG
+    log_config["formatters"]["access"]["fmt"] = "%(asctime)s [%(levelname)s] %(message)s"
+    log_config["formatters"]["default"]["fmt"] = "%(asctime)s [%(levelname)s] %(message)s"
     uvicorn.run(app, host=my_api_host, port=my_api_port )
 
