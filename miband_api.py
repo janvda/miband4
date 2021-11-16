@@ -1,21 +1,14 @@
 # see https://fastapi.tiangolo.com/
-
 import uvicorn, json, random, os, logging, threading, time
 
 from typing    import Optional
 from fastapi   import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic  import BaseModel
 from miband    import miband
 from functools import wraps
 from constants import MUSICSTATE
 from paho.mqtt import client as mqtt_client
-
-from logging_tree import printout
-
-
-# global variables
-band           = None 
-connected      = False
 
 # create decorator function as specified by https://stackoverflow.com/a/64656733/6762442
 def return_404_if_not_connected(func):
@@ -33,32 +26,34 @@ def protect_by_miband_lock(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         global miband_lock
-        logger.info(f"{func.__name__}: acquiring lock ...")
+        logger.debug(f"{func.__name__}(): acquiring lock ...")
         miband_lock.acquire()
         try:
+            logger.info(f"Calling {func.__name__}() ...")
             rc=func(*args, **kwargs)
         finally:
             miband_lock.release()
-            logger.info(f"{func.__name__}:...lock released")
+            logger.debug(f"{func.__name__}():...lock released")
         return rc
     return wrapper
 
 app = FastAPI()
 
-@app.get("/")
+@app.get("/",response_class=HTMLResponse)
 def read_root():
-    return {"info": "TO DO"}
-
-@app.get("/printout")
-def do_printout():
-    printout()
-    return "Done"
-
-@app.get("/loggerhandlers")
-def get_logger_handlers():
-    logger.info("print(logger.handlers):")
-    print(logger.handlers)
-    return "Done"
+    return """
+<!DOCTYPE html>
+<html>
+<body>
+<h1>Miband API</h1>
+<ul>
+<li>github project <a href="https://github.com/janvda/miband4">janvda/miband4</a></li>
+<li><a href="./docs">./docs</a> : FastAPI specification (allows to test it as well)</li>
+<li><a href="./redoc">./redoc</a> : FastAPI specification powered by ReDoc</li>
+</ul>
+</body>
+</html>
+"""
 
 # default callbacks        
 def cb_music_play():
@@ -80,10 +75,10 @@ def cb_music_vdown():
     logger.info("volume down")
     my_mqtt_client.publish(f"{my_mqtt_topic}/music","volume down")
 def cb_music_focus_in():
-    logger.info("Music focus in")
+    logger.info("music focus in")
     my_mqtt_client.publish(f"{my_mqtt_topic}/music","focus in")
 def cb_music_focus_out():
-    logger.info("Music focus out")
+    logger.info("music focus out")
     my_mqtt_client.publish(f"{my_mqtt_topic}/music","focus out")
 
 @app.post("/connect")
@@ -107,6 +102,23 @@ def connect(mac_address: str,authentication_key:str):
             error_str = "Authentication key has not the format of a hexadecimal number !"
         logger.error(error_str)
         raise HTTPException(status_code=400, detail=error_str)
+
+@app.post("/wait_for_notifications")
+@return_404_if_not_connected
+def post_wait_for_notifications():
+    logger.info("Waiting for notifications - infinite loop - never returning !")
+    while True:
+        miband_lock.acquire()
+        try:
+            notification_received = band.waitForNotifications(0.5)
+        except BaseException as error:
+            logger.exception(format(error))
+        finally:
+            miband_lock.release()
+            if not notification_received:
+                time.sleep(0.3)
+    return "error - this should not happen"
+
 
 @app.get("/info")
 @return_404_if_not_connected
@@ -167,22 +179,6 @@ def post_call(message: str, title: str = "New Call"):
 def post_message(message: str, title: str = "Missed Call"):
     return  band.send_custom_alert(3,title,message)
 
-@app.post("/wait_for_notifications")
-@return_404_if_not_connected
-def post_wait_for_notifications():
-    logger.info("Waiting for notifications - infinite loop - never returning !")
-    while True:
-        miband_lock.acquire()
-        try:
-            notification_received = band.waitForNotifications(0.5)
-        except BaseException as error:
-            logger.exception(format(error))
-        finally:
-            miband_lock.release()
-            if not notification_received:
-                time.sleep(0.3)
-    return "error - this should not happen"
-
 @app.post("/music")
 @return_404_if_not_connected
 @protect_by_miband_lock
@@ -199,26 +195,8 @@ def post_music(artist: str = "No Artist",
     band.setTrack(music_state,artist,album,title,volume,position,duration)
     return "ok"
 
-#   -------- TO DELETE ?? ---------------
-class Connection_params(BaseModel):
-    mac_address: str
-    authentication_key: str
 
-@app.post("/connect_old")
-def connect_old(connection_params: Connection_params):
-    global connected, band
-    if connected :
-        band.disconnect()
-    try:
-        band = miband(connection_params.mac_address, 
-                      bytes.fromhex(connection_params.authentication_key), 
-                    debug=True)
-        connected = band.initialize()    
-        return connected
-    except BaseException as error:
-        raise HTTPException(status_code=400, detail=format(error))
-#   ----------------------------------------------
-
+#----- Setting configuration parameters based on environment variables
 my_mqtt_client       = None
 my_mqtt_client_name  = os.getenv("MQTT_CLIENT_NAME","miband-api-service")
 my_mqtt_server       = os.getenv("MQTT_SERVER","127.0.0.1")
@@ -230,44 +208,49 @@ my_mqtt_topic        = os.getenv("MQTT_TOPIC","/miband-api")
 my_api_host          = os.getenv("API_HOST","0.0.0.0") # Bind socket to this host.
 my_api_port          = int(os.getenv("API_PORT","8001"))
 
-if __name__ == "__main__":
-    # logging initialization 
-    logging.basicConfig(format='%(asctime)-15s %(name)s (%(levelname)s) > %(message)s')
-    logger = logging.getLogger("miband_api")
-    logger.setLevel(logging.INFO)
+# logging initialization 
+logging.basicConfig(format='%(asctime)-15s %(name)s (%(levelname)s) > %(message)s')
+logger = logging.getLogger("miband_api")
+logger.setLevel(logging.INFO)
 
-    # The miband operations are based on the bluepy library which is not threadsafe.  
-    # This miband_locak will be used to assure that miband operations are NOT executed in parallel.
-    miband_lock = threading.Lock()
+# The miband operations are based on the bluepy library which is not threadsafe.  
+# This miband_locak will be used to assure that miband operations are NOT executed in parallel.
+miband_lock = threading.Lock()
 
-    # connect to mqtt broker
-    def on_connect(client, userdata, flags, rc):
-        global mqtt_connected
-        if rc == 0:
-            mqtt_connected = True
-            logger.info("... connected to MQTT Broker!")
-        else:
-            logger.error("... failed to connect, return code %d\n", rc)
+# global variables
+band           = None 
+connected      = False
 
-    mqtt_connected = False
-    my_mqtt_client = mqtt_client.Client(my_mqtt_client_name)
-    my_mqtt_client.on_connect = on_connect
-    try:
-        logger.info("Connecting to MQTT broker (%s:%s alive=%s, bind_address=%s)...",
-                     my_mqtt_server,my_mqtt_port,my_mqtt_alive,my_mqtt_bind_address)
-        my_mqtt_client.connect( my_mqtt_server,my_mqtt_port,my_mqtt_alive,my_mqtt_bind_address)
-        my_mqtt_client.loop_start()
-    except ConnectionRefusedError:
-        logger.error(f"... Connection refused ! We can't connect to the MQTT server at {my_mqtt_server}:{my_mqtt_port}.")
-        logger.error(f"Exiting this service as it requires a proper connection to an MQTT server.")
-        logger.info(f"Using environment variables (MQTT_SERVER, MQTT_PORT, MQTT_ALIVE, MQTT_BIND_ADDRESS) you can specify the MQTT server to connect to.")
-        exit()
+# ---------  MQTT setup -------------------------
+# connect to mqtt broker
+def on_connect(client, userdata, flags, rc):
+    global mqtt_connected
+    if rc == 0:
+        mqtt_connected = True
+        logger.info("... connected to MQTT Broker!")
+    else:
+        logger.error("... failed to connect, return code %d\n", rc)
 
-    # configure uvicorn logging
-    log_config = uvicorn.config.LOGGING_CONFIG
-    log_config["formatters"]["access"]["fmt"] = '%(asctime)-15s %(name)s (%(levelname)s) > %(message)s'
-    log_config["formatters"]["default"]["fmt"] = '%(asctime)-15s %(name)s (%(levelname)s) > %(message)s'
-    log_config["loggers"]["uvicorn"]["propagate"] = False
-    #log_config["loggers"]["uvicorn.error"]["propagate"] = False
-    # start app
-    uvicorn.run(app, host=my_api_host, port=my_api_port )
+mqtt_connected = False
+my_mqtt_client = mqtt_client.Client(my_mqtt_client_name)
+my_mqtt_client.on_connect = on_connect
+try:
+    logger.info("Connecting to MQTT broker (%s:%s alive=%s, bind_address=%s)...",
+                    my_mqtt_server,my_mqtt_port,my_mqtt_alive,my_mqtt_bind_address)
+    my_mqtt_client.connect( my_mqtt_server,my_mqtt_port,my_mqtt_alive,my_mqtt_bind_address)
+    my_mqtt_client.loop_start()
+except ConnectionRefusedError:
+    logger.error(f"... Connection refused ! We can't connect to the MQTT server at {my_mqtt_server}:{my_mqtt_port}.")
+    logger.error(f"Exiting this service as it requires a proper connection to an MQTT server.")
+    logger.info(f"Using environment variables (MQTT_SERVER, MQTT_PORT, MQTT_ALIVE, MQTT_BIND_ADDRESS) you can specify the MQTT server to connect to.")
+    exit()
+
+#-------------- Start FastAPI ----------------------
+# configure uvicorn logging
+log_config = uvicorn.config.LOGGING_CONFIG
+log_config["formatters"]["access"]["fmt"] = '%(asctime)-15s %(name)s (%(levelname)s) > %(message)s'
+log_config["formatters"]["default"]["fmt"] = '%(asctime)-15s %(name)s (%(levelname)s) > %(message)s'
+log_config["loggers"]["uvicorn"]["propagate"] = False
+#log_config["loggers"]["uvicorn.error"]["propagate"] = False
+# start api
+uvicorn.run(app, host=my_api_host, port=my_api_port )

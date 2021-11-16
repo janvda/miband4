@@ -181,6 +181,7 @@ class miband(Peripheral):
 
         self._auth_notif(True)
         self.enable_music()
+        self.setTrack(MUSICSTATE.PAUSED)
         self.activity_notif_enabled = False
 
         # set fallback callbacks before delegate starts
