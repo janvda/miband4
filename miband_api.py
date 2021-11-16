@@ -2,9 +2,6 @@
 
 import uvicorn, json, random, os, logging, threading, time
 
-from logging.config            import dictConfig
-from miband_api_logging_config import LogConfig
-
 from typing    import Optional
 from fastapi   import FastAPI, HTTPException
 from pydantic  import BaseModel
@@ -12,6 +9,9 @@ from miband    import miband
 from functools import wraps
 from constants import MUSICSTATE
 from paho.mqtt import client as mqtt_client
+
+from logging_tree import printout
+
 
 # global variables
 band           = None 
@@ -49,6 +49,43 @@ app = FastAPI()
 def read_root():
     return {"info": "TO DO"}
 
+@app.get("/printout")
+def do_printout():
+    printout()
+    return "Done"
+
+@app.get("/loggerhandlers")
+def get_logger_handlers():
+    logger.info("print(logger.handlers):")
+    print(logger.handlers)
+    return "Done"
+
+# default callbacks        
+def cb_music_play():
+    logger.info("play")
+    my_mqtt_client.publish(f"{my_mqtt_topic}/music","play")
+def cb_music_pause():
+    logger.info("pause")
+    my_mqtt_client.publish(f"{my_mqtt_topic}/music","pause")
+def cb_music_forward():
+    logger.info("forward")
+    my_mqtt_client.publish(f"{my_mqtt_topic}/music","forward")
+def cb_music_back():
+    logger.info("backward")
+    my_mqtt_client.publish(f"{my_mqtt_topic}/music","backward")
+def cb_music_vup():
+    logger.info("volume up")
+    my_mqtt_client.publish(f"{my_mqtt_topic}/music","volume up")
+def cb_music_vdown():
+    logger.info("volume down")
+    my_mqtt_client.publish(f"{my_mqtt_topic}/music","volume down")
+def cb_music_focus_in():
+    logger.info("Music focus in")
+    my_mqtt_client.publish(f"{my_mqtt_topic}/music","focus in")
+def cb_music_focus_out():
+    logger.info("Music focus out")
+    my_mqtt_client.publish(f"{my_mqtt_topic}/music","focus out")
+
 @app.post("/connect")
 def connect(mac_address: str,authentication_key:str):
     global connected, band
@@ -60,9 +97,9 @@ def connect(mac_address: str,authentication_key:str):
                     debug=True)
         connected = band.initialize()    
         # set music callbacks
-        band.setMusicCallback(_default_music_play,_default_music_pause, _default_music_forward,
-                             _default_music_back,_default_music_vup,_default_music_vdown,
-                             _default_music_focus_in,_default_music_focus_out)
+        band.setMusicCallback(cb_music_play,     cb_music_pause,    cb_music_forward,
+                              cb_music_back,     cb_music_vup,      cb_music_vdown,
+                              cb_music_focus_in, cb_music_focus_out)
         return connected
     except BaseException as error:
         error_str = format(error)
@@ -103,6 +140,7 @@ def get_current_time():
 
 @app.get("/heart_rate")
 @return_404_if_not_connected
+@protect_by_miband_lock
 def get_heart_rate():
     return band.get_heart_rate_one_time()
  
@@ -157,9 +195,6 @@ def post_music(artist: str = "No Artist",
                duration: int=100
                ):
     music_state = MUSICSTATE.PLAYED if playing else MUSICSTATE.PAUSED
-    band.setMusicCallback(cb_music_play,     cb_music_pause,    cb_music_forward,
-                          cb_music_back,     cb_music_vup,      cb_music_vdown,
-                          cb_music_focus_in, cb_music_focus_out)
     logger.info(f"band.setTrack({music_state},{artist},{album},{title},{volume},{position},{duration})")
     band.setTrack(music_state,artist,album,title,volume,position,duration)
     return "ok"
@@ -184,32 +219,6 @@ def connect_old(connection_params: Connection_params):
         raise HTTPException(status_code=400, detail=format(error))
 #   ----------------------------------------------
 
-# default callbacks        
-def cb_music_play():
-    logger.info("Play")
-    my_mqtt_client.publish(f"{my_mqtt_topic}/music","play")
-def cb_music_pause():
-    logger.info("Pause")
-    my_mqtt_client.publish(f"{my_mqtt_topic}/music","pause")
-def cb_music_forward():
-    logger.info("Forward")
-    my_mqtt_client.publish(f"{my_mqtt_topic}/music","forward")
-def cb_music_back():
-    logger.info("backward")
-    my_mqtt_client.publish(f"{my_mqtt_topic}/music","backward")
-def cb_music_vup():
-    logger.info("volume up")
-    my_mqtt_client.publish(f"{my_mqtt_topic}/music","volume up")
-def cb_music_vdown():
-    logger.info("volume down")
-    my_mqtt_client.publish(f"{my_mqtt_topic}/music","volume down")
-def cb_music_focus_in():
-    logger.info("Music focus in")
-    my_mqtt_client.publish(f"{my_mqtt_topic}/music","focus in")
-def cb_music_focus_out():
-    logger.info("Music focus out")
-    my_mqtt_client.publish(f"{my_mqtt_topic}/music","focus out")
-
 my_mqtt_client       = None
 my_mqtt_client_name  = os.getenv("MQTT_CLIENT_NAME","miband-api-service")
 my_mqtt_server       = os.getenv("MQTT_SERVER","127.0.0.1")
@@ -223,9 +232,9 @@ my_api_port          = int(os.getenv("API_PORT","8001"))
 
 if __name__ == "__main__":
     # logging initialization 
-    #   see https://stackoverflow.com/questions/63510041/adding-python-logging-to-fastapi-endpoints-hosted-on-docker-doesnt-display-api
-    dictConfig(LogConfig().dict())
+    logging.basicConfig(format='%(asctime)-15s %(name)s (%(levelname)s) > %(message)s')
     logger = logging.getLogger("miband_api")
+    logger.setLevel(logging.INFO)
 
     # The miband operations are based on the bluepy library which is not threadsafe.  
     # This miband_locak will be used to assure that miband operations are NOT executed in parallel.
@@ -256,7 +265,9 @@ if __name__ == "__main__":
 
     # configure uvicorn logging
     log_config = uvicorn.config.LOGGING_CONFIG
-    log_config["formatters"]["access"]["fmt"] = "%(asctime)s [%(levelname)s] %(message)s"
-    log_config["formatters"]["default"]["fmt"] = "%(asctime)s [%(levelname)s] %(message)s"
+    log_config["formatters"]["access"]["fmt"] = '%(asctime)-15s %(name)s (%(levelname)s) > %(message)s'
+    log_config["formatters"]["default"]["fmt"] = '%(asctime)-15s %(name)s (%(levelname)s) > %(message)s'
+    log_config["loggers"]["uvicorn"]["propagate"] = False
+    #log_config["loggers"]["uvicorn.error"]["propagate"] = False
     # start app
     uvicorn.run(app, host=my_api_host, port=my_api_port )

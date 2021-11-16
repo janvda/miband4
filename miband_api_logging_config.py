@@ -26,5 +26,5 @@ class LogConfig(BaseModel):
         },
     }
     loggers = {
-        "miband_api": {"handlers": ["default"], "level": LOG_LEVEL},
+        "miband_api": {"handlers": ["default"], "level": LOG_LEVEL, "propagate" : False },
     }
