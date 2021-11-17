@@ -9,6 +9,7 @@ from miband    import miband
 from functools import wraps
 from constants import MUSICSTATE
 from paho.mqtt import client as mqtt_client
+from datetime import datetime
 
 # create decorator function as specified by https://stackoverflow.com/a/64656733/6762442
 def return_404_if_not_connected(func):
@@ -90,6 +91,8 @@ def cb_found_device():
     logger.info("found device")
     my_mqtt_client.publish(f"{my_mqtt_topic}","found device")
 
+def cb_activity_log(timestamp,c,i,s,h):
+    logger.info("{}: category: {}; intensity {}; steps {}; heart rate {};".format( timestamp.strftime('%y-%m-%d %H:%M:%S'), c, i ,s ,h))
 
 @app.post("/connect")
 def connect(mac_address: str,authentication_key:str):
@@ -206,6 +209,13 @@ def post_music(artist: str = "No Artist",
     band.setTrack(music_state,artist,album,title,volume,position,duration)
     return "ok"
 
+@app.post("/activity_logs")
+@return_404_if_not_connected
+@protect_by_miband_lock
+def get_activity_logs():
+    #gets activity log for this day.
+    temp = datetime.now()
+    band.get_activity_betwn_intervals(datetime(temp.year,temp.month,temp.day),datetime.now(),cb_activity_log)
 
 #----- Setting configuration parameters based on environment variables
 my_mqtt_client       = None
