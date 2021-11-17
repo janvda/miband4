@@ -83,6 +83,14 @@ def cb_music_focus_out():
     logger.info("music focus out")
     my_mqtt_client.publish(f"{my_mqtt_topic}/music","focus out")
 
+def cb_lost_device():
+    logger.info("lost device")
+    my_mqtt_client.publish(f"{my_mqtt_topic}","lost device")
+def cb_found_device():
+    logger.info("found device")
+    my_mqtt_client.publish(f"{my_mqtt_topic}","found device")
+
+
 @app.post("/connect")
 def connect(mac_address: str,authentication_key:str):
     global connected, band
@@ -93,10 +101,11 @@ def connect(mac_address: str,authentication_key:str):
                       bytes.fromhex(authentication_key), 
                     debug=True)
         connected = band.initialize()    
-        # set music callbacks
+        # set callbacks
         band.setMusicCallback(cb_music_play,     cb_music_pause,    cb_music_forward,
                               cb_music_back,     cb_music_vup,      cb_music_vdown,
                               cb_music_focus_in, cb_music_focus_out)
+        band.setLostDeviceCallback(cb_lost_device, cb_found_device)
         return connected
     except BaseException as error:
         error_str = format(error)
