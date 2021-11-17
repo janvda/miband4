@@ -9,7 +9,8 @@ from miband    import miband
 from functools import wraps
 from constants import MUSICSTATE
 from paho.mqtt import client as mqtt_client
-from datetime import datetime
+from datetime  import datetime
+from bluepy    import btle
 
 # create decorator function as specified by https://stackoverflow.com/a/64656733/6762442
 def return_404_if_not_connected(func):
@@ -101,7 +102,9 @@ def cb_heart_rate(data):
 def connect(mac_address: str,authentication_key:str):
     global connected, band
     if connected :
-        band.disconnect()
+        error_str = "Trying to connect while already connected."
+        logger.error(error_str)
+        raise HTTPException(status_code=400,detail=error_str)
     try:
         band = miband(mac_address, 
                       bytes.fromhex(authentication_key), 
@@ -124,18 +127,22 @@ def connect(mac_address: str,authentication_key:str):
 @return_404_if_not_connected
 def post_wait_for_notifications():
     logger.info("Waiting for notifications - infinite loop - never returning !")
-    while True:
-        miband_lock.acquire()
-        try:
-            notification_received = band.waitForNotifications(0.5)
-        except BaseException as error:
-            logger.exception(format(error))
-        finally:
-            miband_lock.release()
+    try:
+        while True:
+            miband_lock.acquire()
+            try:
+                notification_received = band.waitForNotifications(0.5)
+            #except BaseException as error:
+            #    logger.exception(format(error))
+            finally:
+                miband_lock.release()
             if not notification_received:
                 time.sleep(0.3)
-    return "error - this should not happen"
-
+    except btle.BTLEDisconnectError as error:
+        logger.warning(f"BTLEDisconnectError: {error} (miband went out of range ?)")
+        global connected
+        connected = False
+    return "BTLEDisconnectError"
 
 @app.get("/info")
 @return_404_if_not_connected
