@@ -105,23 +105,26 @@ def connect(mac_address: str,authentication_key:str):
         error_str = "Trying to connect while already connected."
         logger.error(error_str)
         raise HTTPException(status_code=400,detail=error_str)
-    try:
-        band = miband(mac_address, 
-                      bytes.fromhex(authentication_key), 
-                    debug=True)
-        connected = band.initialize()    
-        # set callbacks
-        band.setMusicCallback(cb_music_play,     cb_music_pause,    cb_music_forward,
-                              cb_music_back,     cb_music_vup,      cb_music_vdown,
-                              cb_music_focus_in, cb_music_focus_out)
-        band.setLostDeviceCallback(cb_lost_device, cb_found_device)
-        return connected
-    except BaseException as error:
-        error_str = format(error)
-        if "non-hexadecimal number found in fromhex()" in error_str:
-            error_str = "Authentication key has not the format of a hexadecimal number !"
-        logger.error(error_str)
-        raise HTTPException(status_code=400, detail=error_str)
+    while not connected:
+        try:
+            band = miband(mac_address, 
+                        bytes.fromhex(authentication_key), 
+                        debug=True)
+            connected = band.initialize()    
+            # set callbacks
+            band.setMusicCallback(cb_music_play,     cb_music_pause,    cb_music_forward,
+                                cb_music_back,     cb_music_vup,      cb_music_vdown,
+                                cb_music_focus_in, cb_music_focus_out)
+            band.setLostDeviceCallback(cb_lost_device, cb_found_device)
+        except btle.BTLEDisconnectError as error:
+            logger.info("BTLEDisconnectError - retrying")
+        except BaseException as error:
+            error_str = format(error)
+            if "non-hexadecimal number found in fromhex()" in error_str:
+                error_str = "Authentication key has not the format of a hexadecimal number !"
+            logger.exception(error_str)
+            raise HTTPException(status_code=400, detail=error_str)
+    return connected
 
 @app.post("/wait_for_notifications")
 @return_404_if_not_connected
@@ -303,11 +306,6 @@ def connect_to_miband_device():
             logger.info("Disconnected to miband device")
             my_mqtt_client.publish(f"{my_mqtt_topic}","disconnected")
     return
-
-def test12():
-    logger.info("begin test")
-    time.sleep(5)
-    logger.info("end test")
 
 # run connect_to_miband_device() in a separate thread.
 import concurrent.futures
