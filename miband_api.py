@@ -56,7 +56,7 @@ def read_root():
 </html>
 """
 
-# default callbacks        
+# callbacks        
 def cb_music_play():
     logger.info("play")
     my_mqtt_client.publish(f"{my_mqtt_topic}/music","play")
@@ -93,6 +93,9 @@ def cb_found_device():
 
 def cb_activity_log(timestamp,c,i,s,h):
     logger.info("{}: category: {}; intensity {}; steps {}; heart rate {};".format( timestamp.strftime('%y-%m-%d %H:%M:%S'), c, i ,s ,h))
+
+def cb_heart_rate(data):
+    logger.info(f"Realtime heart BPM: {data}")
 
 @app.post("/connect")
 def connect(mac_address: str,authentication_key:str):
@@ -216,6 +219,12 @@ def get_activity_logs():
     #gets activity log for this day.
     temp = datetime.now()
     band.get_activity_betwn_intervals(datetime(temp.year,temp.month,temp.day),datetime.now(),cb_activity_log)
+
+@app.post("/heart_rate_realtime")
+@return_404_if_not_connected
+@protect_by_miband_lock
+def get_heart_rate_realtime():
+    band.start_heart_rate_realtime(heart_measure_callback=cb_heart_rate)
 
 #----- Setting configuration parameters based on environment variables
 my_mqtt_client       = None
