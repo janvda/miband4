@@ -219,7 +219,7 @@ def post_music(artist: str = "No Artist",
     band.setTrack(music_state,artist,album,title,volume,position,duration)
     return "ok"
 
-@app.post("/activity_logs")
+@app.get("/activity_logs")
 @return_404_if_not_connected
 @protect_by_miband_lock
 def get_activity_logs():
@@ -227,7 +227,7 @@ def get_activity_logs():
     temp = datetime.now()
     band.get_activity_betwn_intervals(datetime(temp.year,temp.month,temp.day),datetime.now(),cb_activity_log)
 
-@app.post("/heart_rate_realtime")
+@app.get("/heart_rate_realtime")
 @return_404_if_not_connected
 @protect_by_miband_lock
 def get_heart_rate_realtime():
