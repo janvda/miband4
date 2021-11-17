@@ -613,6 +613,16 @@ class miband(Peripheral):
         self.volume = volume
         self.setMusic()
 
+    # Sets the pause/play icon in the music menu to pause icon
+    def setMusicPauseIcon(self):
+        self.pp_state = MUSICSTATE.PAUSED
+        self.setMusic()
+
+    # Sets the pause/play icon in the music menu to play icon
+    def setMusicPlayIcon(self):
+        self.pp_state = MUSICSTATE.PLAYED
+        self.setMusic()
+
     def setMusicCallback(self,play=None,pause=None,forward=None,backward=None,volumeup=None,volumedown=None,focusin=None,focusout=None):
         if play is not None:
             self._default_music_play = play

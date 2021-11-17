@@ -59,9 +59,11 @@ def read_root():
 def cb_music_play():
     logger.info("play")
     my_mqtt_client.publish(f"{my_mqtt_topic}/music","play")
+    band.setMusicPauseIcon()
 def cb_music_pause():
     logger.info("pause")
     my_mqtt_client.publish(f"{my_mqtt_topic}/music","pause")
+    band.setMusicPlayIcon()
 def cb_music_forward():
     logger.info("forward")
     my_mqtt_client.publish(f"{my_mqtt_topic}/music","forward")
