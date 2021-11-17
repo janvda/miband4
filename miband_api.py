@@ -3,7 +3,7 @@ import uvicorn, json, random, os, logging, threading, time
 
 from typing    import Optional
 from fastapi   import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses   import HTMLResponse
 from pydantic  import BaseModel
 from miband    import miband
 from functools import wraps
@@ -126,7 +126,7 @@ def connect(mac_address: str,authentication_key:str):
 @app.post("/wait_for_notifications")
 @return_404_if_not_connected
 def post_wait_for_notifications():
-    logger.info("Waiting for notifications - infinite loop - never returning !")
+    logger.info("Waiting for notifications:")
     try:
         while True:
             miband_lock.acquire()
@@ -234,6 +234,9 @@ def get_heart_rate_realtime():
     band.start_heart_rate_realtime(heart_measure_callback=cb_heart_rate)
 
 #----- Setting configuration parameters based on environment variables
+miband_mac           = os.getenv("MIBAND_MAC")
+miband_key           = os.getenv("MIBAND_AUTH_KEY")
+
 my_mqtt_client       = None
 my_mqtt_client_name  = os.getenv("MQTT_CLIENT_NAME","miband-api-service")
 my_mqtt_server       = os.getenv("MQTT_SERVER","127.0.0.1")
@@ -267,6 +270,7 @@ def on_connect(client, userdata, flags, rc):
         logger.info("... connected to MQTT Broker!")
     else:
         logger.error("... failed to connect, return code %d\n", rc)
+        exit()
 
 mqtt_connected = False
 my_mqtt_client = mqtt_client.Client(my_mqtt_client_name)
@@ -276,12 +280,41 @@ try:
                     my_mqtt_server,my_mqtt_port,my_mqtt_alive,my_mqtt_bind_address)
     my_mqtt_client.connect( my_mqtt_server,my_mqtt_port,my_mqtt_alive,my_mqtt_bind_address)
     my_mqtt_client.loop_start()
+    my_mqtt_client.publish(f"{my_mqtt_topic}","service started")
 except ConnectionRefusedError:
     logger.error(f"... Connection refused ! We can't connect to the MQTT server at {my_mqtt_server}:{my_mqtt_port}.")
     logger.error(f"Exiting this service as it requires a proper connection to an MQTT server.")
     logger.info(f"Using environment variables (MQTT_SERVER, MQTT_PORT, MQTT_ALIVE, MQTT_BIND_ADDRESS) you can specify the MQTT server to connect to.")
     exit()
 
+# ---------  connected to miband device -------------------------
+def connect_to_miband_device():
+    global mqtt_connected
+    while not mqtt_connected:
+        logger.info("Waiting for MQTT connect")
+        time.sleep(1.5)
+    logger.info("Infinite loop (re)connecting to miband device")
+    while True:
+        connect(miband_mac,miband_key)
+        logger.info("Connected to miband device")
+        my_mqtt_client.publish(f"{my_mqtt_topic}","connected")
+        if connected:
+            post_wait_for_notifications()
+            logger.info("Disconnected to miband device")
+            my_mqtt_client.publish(f"{my_mqtt_topic}","disconnected")
+    return
+
+def test12():
+    logger.info("begin test")
+    time.sleep(5)
+    logger.info("end test")
+
+# run connect_to_miband_device() in a separate thread.
+import concurrent.futures
+executor=concurrent.futures.ThreadPoolExecutor()
+future = executor.submit(connect_to_miband_device)
+
+logger.info("Starting FastAPI")
 #-------------- Start FastAPI ----------------------
 # configure uvicorn logging
 log_config = uvicorn.config.LOGGING_CONFIG
