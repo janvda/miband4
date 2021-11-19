@@ -12,6 +12,12 @@ from paho.mqtt import client as mqtt_client
 from datetime  import datetime
 from bluepy    import btle
 
+if not (os.getenv("SLEEP_FOREVER","False") in [ "0", "False", "false", "FALSE" ]) : 
+    print("Environment variable SLEEP_FOREVER is set, so this service will sleep forever.")
+    while True:
+        print(" zzz....")
+        time.sleep(3600)
+
 # create decorator function as specified by https://stackoverflow.com/a/64656733/6762442
 def return_404_if_not_connected(func):
     @wraps(func)
@@ -94,9 +100,11 @@ def cb_found_device():
 
 def cb_activity_log(timestamp,c,i,s,h):
     logger.info("{}: category: {}; intensity {}; steps {}; heart rate {};".format( timestamp.strftime('%y-%m-%d %H:%M:%S'), c, i ,s ,h))
+    my_mqtt_client.publish(f"{my_mqtt_topic}/activity","TO DO")
 
 def cb_heart_rate(data):
     logger.info(f"Realtime heart BPM: {data}")
+    my_mqtt_client.publish(f"{my_mqtt_topic}/heart_rate",data)
 
 @app.post("/connect")
 def connect(mac_address: str,authentication_key:str):
