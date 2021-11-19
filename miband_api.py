@@ -1,5 +1,5 @@
 # see https://fastapi.tiangolo.com/
-import uvicorn, json, random, os, logging, threading, time
+import uvicorn, json, random, os, logging, threading, time, json
 
 from typing    import Optional
 from fastapi   import FastAPI, HTTPException
@@ -12,10 +12,15 @@ from paho.mqtt import client as mqtt_client
 from datetime  import datetime
 from bluepy    import btle
 
+# logging initialization 
+logging.basicConfig(format='%(asctime)-15s %(name)s (%(levelname)s) > %(message)s')
+logger = logging.getLogger("miband_api")
+logger.setLevel(logging.INFO)
+
 if not (os.getenv("SLEEP_FOREVER","False") in [ "0", "False", "false", "FALSE" ]) : 
-    print("Environment variable SLEEP_FOREVER is set, so this service will sleep forever.")
+    logger.warning("Environment variable SLEEP_FOREVER is set, so this service will sleep forever.")
     while True:
-        print(" zzz....")
+        logger.info("Zzzz....")
         time.sleep(3600)
 
 # create decorator function as specified by https://stackoverflow.com/a/64656733/6762442
@@ -99,8 +104,10 @@ def cb_found_device():
     my_mqtt_client.publish(f"{my_mqtt_topic}","found device")
 
 def cb_activity_log(timestamp,c,i,s,h):
-    logger.info("{}: category: {}; intensity {}; steps {}; heart rate {};".format( timestamp.strftime('%y-%m-%d %H:%M:%S'), c, i ,s ,h))
-    my_mqtt_client.publish(f"{my_mqtt_topic}/activity","TO DO")
+    activity_log = { "timestamp_ms" : int(timestamp.timestamp() * 1000), "timestamp_local" : timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                     "category" : c, "intensity" : i, "steps" : s, "heart_rate" : h }
+    logger.info(json.dumps(activity_log))
+    my_mqtt_client.publish(f"{my_mqtt_topic}/activity",json.dumps(activity_log))
 
 def cb_heart_rate(data):
     logger.info(f"Realtime heart BPM: {data}")
@@ -258,11 +265,6 @@ my_mqtt_topic        = os.getenv("MQTT_TOPIC","/miband-api")
 
 my_api_host          = os.getenv("API_HOST","0.0.0.0") # Bind socket to this host.
 my_api_port          = int(os.getenv("API_PORT","8001"))
-
-# logging initialization 
-logging.basicConfig(format='%(asctime)-15s %(name)s (%(levelname)s) > %(message)s')
-logger = logging.getLogger("miband_api")
-logger.setLevel(logging.INFO)
 
 # The miband operations are based on the bluepy library which is not threadsafe.  
 # This miband_locak will be used to assure that miband operations are NOT executed in parallel.
