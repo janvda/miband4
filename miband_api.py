@@ -9,7 +9,7 @@ from miband    import miband
 from functools import wraps
 from constants import MUSICSTATE
 from paho.mqtt import client as mqtt_client
-from datetime  import datetime
+from datetime  import datetime, timedelta
 from bluepy    import btle
 
 # logging initialization 
@@ -237,19 +237,49 @@ def post_music(artist: str = "No Artist",
     band.setTrack(music_state,artist,album,title,volume,position,duration)
     return "ok"
 
-@app.get("/activity_logs")
+@app.post("/retrieve_activity")
 @return_404_if_not_connected
 @protect_by_miband_lock
-def get_activity_logs():
-    #gets activity log for this day.
-    temp = datetime.now()
-    band.get_activity_betwn_intervals(datetime(temp.year,temp.month,temp.day),datetime.now(),cb_activity_log)
+# start and end time specified in milliseconds since epoch
+# default start time is today
+# default end time is 2035-01-01
+def retrieve_activity(start_time_ms:int = 0, end_time_ms:int = 2051218800000):
+    start_time=datetime.fromtimestamp(start_time_ms/1000.0)
+    end_time=datetime.fromtimestamp(end_time_ms/1000.0)
+    logger.info(f"retrieving activity between {start_time} and {end_time}")
+    return band.get_activity_betwn_intervals(start_time,end_time,cb_activity_log)
 
-@app.get("/heart_rate_realtime")
+@app.post("/retrieve_last_activity")
 @return_404_if_not_connected
 @protect_by_miband_lock
-def get_heart_rate_realtime():
-    band.start_heart_rate_realtime(heart_measure_callback=cb_heart_rate)
+def retrieve_last_activity(minutes_ago:int = 10):
+    start_time_ms = int( ( datetime.now() - timedelta(minutes = minutes_ago) ).timestamp()*1000 )
+    return retrieve_activity(start_time_ms)
+
+@app.post("/start_heart_rate_monitor")
+@return_404_if_not_connected
+@protect_by_miband_lock
+def start_heart_rate_monitor(measure_minute_interval: int=1):
+    return band.set_heart_monitor_sleep_support(True,measure_minute_interval)
+
+@app.post("/stop_heart_rate_monitor")
+@return_404_if_not_connected
+@protect_by_miband_lock
+def stop_heart_rate_monitor():
+    return band.set_heart_monitor_sleep_support(False)
+
+@app.post("/start_heart_rate_realtime")
+@return_404_if_not_connected
+@protect_by_miband_lock
+def start_heart_rate_realtime():
+    return band.start_heart_rate_realtime(heart_measure_callback=cb_heart_rate)
+
+@app.post("/stop_heart_rate_realtime")
+@return_404_if_not_connected
+@protect_by_miband_lock
+def stop_heart_rate_realtime():
+    return band.stop_realtime()
+
 
 #----- Setting configuration parameters based on environment variables
 miband_mac           = os.getenv("MIBAND_MAC")
