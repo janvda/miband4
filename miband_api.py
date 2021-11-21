@@ -243,18 +243,24 @@ def post_music(artist: str = "No Artist",
 # start and end time specified in milliseconds since epoch
 # default start time is today
 # default end time is 2035-01-01
-def retrieve_activity(start_time_ms:int = 0, end_time_ms:int = 2051218800000):
-    start_time=datetime.fromtimestamp(start_time_ms/1000.0)
-    end_time=datetime.fromtimestamp(end_time_ms/1000.0)
+def retrieve_activity(start_time_ms:int = -1, end_time_ms:int = -1):
+    if (start_time_ms == -1 ):
+        start_time = datetime.now() - timedelta(hours = 24)
+    else:
+        start_time = datetime.fromtimestamp(start_time_ms/1000.0)
+    if (end_time_ms == -1 ):
+        end_time = datetime.now() + timedelta(minutes = 1)
+    else:
+        end_time=datetime.fromtimestamp(end_time_ms/1000.0)
     logger.info(f"retrieving activity between {start_time} and {end_time}")
     return band.get_activity_betwn_intervals(start_time,end_time,cb_activity_log)
 
 @app.post("/retrieve_last_activity")
 @return_404_if_not_connected
-@protect_by_miband_lock
+#don't add @protect_by_miband_lock as this happens when calling retrieve_activity.
 def retrieve_last_activity(minutes_ago:int = 10):
     start_time_ms = int( ( datetime.now() - timedelta(minutes = minutes_ago) ).timestamp()*1000 )
-    return retrieve_activity(start_time_ms)
+    return retrieve_activity(start_time_ms,-1)
 
 @app.post("/start_heart_rate_monitor")
 @return_404_if_not_connected
