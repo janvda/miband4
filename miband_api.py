@@ -282,7 +282,7 @@ def start_heart_rate_realtime():
 
 @app.post("/stop_heart_rate_realtime")
 @return_404_if_not_connected
-@protect_by_miband_lock
+#@protect_by_miband_lock
 def stop_heart_rate_realtime():
     return band.stop_realtime()
 
