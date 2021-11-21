@@ -1,6 +1,7 @@
 auth_key.txt
 tester.py
 test.py
+core
 .vscode/
 # Byte-compiled / optimized / DLL files
 __pycache__/
