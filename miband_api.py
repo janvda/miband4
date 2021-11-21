@@ -113,7 +113,7 @@ def cb_heart_rate(data):
     logger.info(f"Realtime heart BPM: {data}")
     my_mqtt_client.publish(f"{my_mqtt_topic}/heart_rate",data)
 
-@app.post("/connect")
+#@app.post("/connect")
 def connect(mac_address: str,authentication_key:str):
     global connected, band
     if connected :
@@ -141,7 +141,7 @@ def connect(mac_address: str,authentication_key:str):
             raise HTTPException(status_code=400, detail=error_str)
     return connected
 
-@app.post("/wait_for_notifications")
+#@app.post("/wait_for_notifications")
 @return_404_if_not_connected
 def post_wait_for_notifications():
     logger.info("Waiting for notifications:")
@@ -166,11 +166,11 @@ def post_wait_for_notifications():
 @return_404_if_not_connected
 @protect_by_miband_lock
 def get_info():
-    info = { "Soft revision" : band.get_revision(),
-             "Hardware revision" : band.get_hrdw_revision(),
-             "Serial" : band.get_serial(),
-             "Battery" : band.get_battery_info()['level'],
-             "Time" : band.get_current_time()['date'].isoformat()
+    info = { "software revision" : band.get_revision(),
+             "hardware revision" : band.get_hrdw_revision(),
+             "serial number" : band.get_serial(),
+             "battery level" : band.get_battery_info()['level'],
+             "time" : band.get_current_time()['date'].isoformat()
             }
     return info
 
