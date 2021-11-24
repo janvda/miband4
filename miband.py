@@ -87,8 +87,8 @@ class Delegate(DefaultDelegate):
                 self.pkg += 1
                 i = 1
                 while i < len(data):
-                    index = int(self.pkg) * 4 + (i - 1) / 4
-                    timestamp = self.device.first_timestamp + timedelta(minutes=index)
+                    index = ( int(self.pkg) -1 ) * 4 + (i - 1) / 4
+                    timestamp = self.device.first_timestamp + timedelta(minutes= index )
                     self.device.last_timestamp = timestamp
                     category = struct.unpack("<B", data[i:i + 1])[0]
                     intensity = struct.unpack("B", data[i + 1:i + 2])[0]
