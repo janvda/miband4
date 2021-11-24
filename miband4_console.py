@@ -207,13 +207,13 @@ def lost_device():
 
 
 def activity_log_callback(timestamp,c,i,s,h):
-    print("{}: category: {}; intensity {}; steps {}; heart rate {};\n".format( timestamp.strftime('%d.%m - %H:%M'), c, i ,s ,h))
+    print("  > {}: category: {}; intensity {}; steps {}; heart rate {}".format( timestamp.strftime('%Y-%m-%d %H:%M'), c, i ,s ,h))
 
 #Needs auth    
 def get_activity_logs():
     #gets activity log for this day.
     temp = datetime.now()
-    band.get_activity_betwn_intervals(datetime(temp.year,temp.month,temp.day),datetime.now(),activity_log_callback)
+    band.get_activity_betwn_intervals(datetime(temp.year,temp.month,temp.day,temp.hour),datetime.now(),activity_log_callback)
     while True:
         band.waitForNotifications(0.2)
 
@@ -244,7 +244,7 @@ if __name__ == "__main__":
     steps_item = FunctionItem("@ Get Steps/Meters/Calories/Fat Burned", get_step_count)
     single_heart_rate_item = FunctionItem("@ Get Heart Rate", get_heart_rate)
     real_time_heart_rate_item = FunctionItem("@ Get realtime heart rate data", get_realtime)
-    get_band_activity_data_item = FunctionItem("@ Get activity logs for a day", get_activity_logs)
+    get_band_activity_data_item = FunctionItem("@ Get activity logs for current hour", get_activity_logs)
     set_time_item= FunctionItem("@ Set the band's time to system time", set_time)
     update_watchface_item = FunctionItem("@ Update Watchface", update_watchface)
     dfu_update_item = FunctionItem("@ Restore/Update Firmware", restore_firmware)

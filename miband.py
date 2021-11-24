@@ -54,6 +54,7 @@ class Delegate(DefaultDelegate):
                 self.device.queue.put((QUEUE_TYPES.RAW_HEART, data))
         # The fetch characteristic controls the communication with the activity characteristic.
         elif hnd == self.device._char_fetch.getHandle():
+            print(f"_char_fetch.getHandle(): {len(data)} bytes received, processing them ...")
             if data[:3] == b'\x10\x01\x01':
                 # get timestamp from what date the data actually is received
                 year = struct.unpack("<H", data[7:9])[0]
@@ -62,25 +63,26 @@ class Delegate(DefaultDelegate):
                 hour = struct.unpack("b", data[11:12])[0]
                 minute = struct.unpack("b", data[12:13])[0]
                 self.device.first_timestamp = datetime(year, month, day, hour, minute)
-                print("Fetch data from {}-{}-{} {}:{}".format(year, month, day, hour, minute))
+                print("  > Fetch data from {}-{}-{} {}:{}".format(year, month, day, hour, minute))
                 self.pkg = 0 #reset the packing index
                 self.device._char_fetch.write(b'\x02', False)
             elif data[:3] == b'\x10\x02\x01':
                 if self.device.last_timestamp > self.device.end_timestamp - timedelta(minutes=1):
-                    print("Finished fetching")
+                    print("  > Finished fetching")
                     return
-                print("Trigger more communication")
+                print("  > Trigger more communication")
                 time.sleep(1)
                 t = self.device.last_timestamp + timedelta(minutes=1)
                 self.device.start_get_previews_data(t)
 
             elif data[:3] == b'\x10\x02\x04':
-                print("No more activity fetch possible")
+                print("  > No more activity fetch possible")
                 return
             else:
-                print("Unexpected data on handle " + str(hnd) + ": " + str(data))
+                print("  > Unexpected data on handle " + str(hnd) + ": " + str(data))
                 return
         elif hnd == self.device._char_activity.getHandle():
+            print(f"_char_activity.getHandle(): {len(data)} bytes received, processing them ...")
             if len(data) % 4 == 1:
                 self.pkg += 1
                 i = 1
@@ -94,6 +96,8 @@ class Delegate(DefaultDelegate):
                     heart_rate = struct.unpack("B", data[i + 3:i + 4])[0]
                     if timestamp < self.device.end_timestamp:
                         self.device.activity_callback(timestamp,category,intensity,steps,heart_rate)
+                    else:
+                        print(f"  >ignoring received data as timestamp={timestamp} >= end_timestamp={self.device.end_timestamp}")
                     i += 4
 
         #music controls & lost device
@@ -549,7 +553,7 @@ class miband(Peripheral):
         if not self.activity_notif_enabled:
             self._auth_previews_data_notif(True)
             self.waitForNotifications(0.1)
-        print("Trigger activity communication")
+        print(f"start_get_previews_data({start_timestamp})...")
         year = struct.pack("<H", start_timestamp.year)
         month = struct.pack("b", start_timestamp.month)
         day = struct.pack("b", start_timestamp.day)
@@ -558,6 +562,7 @@ class miband(Peripheral):
         ts = year + month + day + hour + minute
         char = self.svc_1.getCharacteristics(UUIDS.CHARACTERISTIC_CURRENT_TIME)[0]
         utc_offset = char.read()[9:11]
+        print(f"  >uct_offset={utc_offset}")
         trigger = b'\x01\x01' + ts + utc_offset
         self._char_fetch.write(trigger, False)
         self.active = True

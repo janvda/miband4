@@ -166,10 +166,10 @@ def post_wait_for_notifications():
 @return_404_if_not_connected
 @protect_by_miband_lock
 def get_info():
-    info = { "software revision" : band.get_revision(),
-             "hardware revision" : band.get_hrdw_revision(),
-             "serial number" : band.get_serial(),
-             "battery level" : band.get_battery_info()['level'],
+    info = { "software_version" : band.get_revision(),
+             "hardware_version" : band.get_hrdw_revision(),
+             "serial_number" : band.get_serial(),
+             "battery_level" : band.get_battery_info()['level'],
              "time" : band.get_current_time()['date'].isoformat()
             }
     return info
