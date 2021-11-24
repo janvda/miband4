@@ -9,7 +9,7 @@ from datetime import datetime
 try:
     import zlib
 except ImportError:
-    print("zlib module not found. Updating watchface/firmware requires zlib")
+    self._log.info("zlib module not found. Updating watchface/firmware requires zlib")
 try:
     from Queue import Queue, Empty
 except ImportError:
@@ -25,6 +25,7 @@ class Delegate(DefaultDelegate):
         DefaultDelegate.__init__(self)
         self.device = device
         self.pkg = 0
+        self._log = device._log
 
     def handleNotification(self, hnd, data):
         if hnd == self.device._char_auth.getHandle():
@@ -54,7 +55,7 @@ class Delegate(DefaultDelegate):
                 self.device.queue.put((QUEUE_TYPES.RAW_HEART, data))
         # The fetch characteristic controls the communication with the activity characteristic.
         elif hnd == self.device._char_fetch.getHandle():
-            print(f"_char_fetch.getHandle(): {len(data)} bytes received, processing them ...")
+            self._log.debug(f"_char_fetch.getHandle(): {len(data)} bytes received, processing them ...")
             if data[:3] == b'\x10\x01\x01':
                 # get timestamp from what date the data actually is received
                 year = struct.unpack("<H", data[7:9])[0]
@@ -63,26 +64,26 @@ class Delegate(DefaultDelegate):
                 hour = struct.unpack("b", data[11:12])[0]
                 minute = struct.unpack("b", data[12:13])[0]
                 self.device.first_timestamp = datetime(year, month, day, hour, minute)
-                print("  > Fetch data from {}-{}-{} {}:{}".format(year, month, day, hour, minute))
+                self._log.debug("  > Fetch data from {}-{}-{} {}:{}".format(year, month, day, hour, minute))
                 self.pkg = 0 #reset the packing index
                 self.device._char_fetch.write(b'\x02', False)
             elif data[:3] == b'\x10\x02\x01':
                 if self.device.last_timestamp > self.device.end_timestamp - timedelta(minutes=1):
-                    print("  > Finished fetching")
+                    self._log.debug("  > Finished fetching")
                     return
-                print("  > Trigger more communication")
+                self._log.debug("  > Trigger more communication")
                 time.sleep(1)
                 t = self.device.last_timestamp + timedelta(minutes=1)
                 self.device.start_get_previews_data(t)
 
             elif data[:3] == b'\x10\x02\x04':
-                print("  > No more activity fetch possible")
+                self._log.debug("  > No more activity fetch possible")
                 return
             else:
-                print("  > Unexpected data on handle " + str(hnd) + ": " + str(data))
+                self._log.debug("  > Unexpected data on handle " + str(hnd) + ": " + str(data))
                 return
         elif hnd == self.device._char_activity.getHandle():
-            print(f"_char_activity.getHandle(): {len(data)} bytes received, processing them ...")
+            self._log.debug(f"_char_activity.getHandle(): {len(data)} bytes received, processing them ...")
             if len(data) % 4 == 1:
                 self.pkg += 1
                 i = 1
@@ -97,7 +98,7 @@ class Delegate(DefaultDelegate):
                     if timestamp < self.device.end_timestamp:
                         self.device.activity_callback(timestamp,category,intensity,steps,heart_rate)
                     else:
-                        print(f"  >ignoring received data as timestamp={timestamp} >= end_timestamp={self.device.end_timestamp}")
+                        self._log.debug(f"  >ignoring received data as timestamp={timestamp} >= end_timestamp={self.device.end_timestamp}")
                     i += 4
 
         #music controls & lost device
@@ -137,17 +138,15 @@ class Delegate(DefaultDelegate):
                 if(self.device._default_music_vdown):
                     self.device._default_music_vdown()
 
-
 class miband(Peripheral):
     _send_rnd_cmd = struct.pack('<2s', b'\x02\x00')
     _send_enc_key = struct.pack('<2s', b'\x03\x00')
-    def __init__(self, mac_address,key=None, timeout=0.5, debug=False):
+    def __init__(self, mac_address,key=None, timeout=0.5):
         FORMAT = '%(asctime)-15s %(name)s (%(levelname)s) > %(message)s'
-        logging.basicConfig(format=FORMAT)
-        log_level = logging.WARNING if not debug else logging.DEBUG
+        logging.basicConfig(format=FORMAT,
+                            level=os.environ.get('LOGLEVEL', 'INFO').upper())
         self._log = logging.getLogger(self.__class__.__name__)
-        self._log.setLevel(log_level)
-
+        #self._log.setLevel(log_level)
 
         self._log.info('Connecting to ' + mac_address)
         Peripheral.__init__(self, mac_address, addrType=ADDR_TYPE_PUBLIC)
@@ -449,7 +448,7 @@ class miband(Peripheral):
         char_d.write(b'\x00\x00', True)
 
     def dfuUpdate(self,fileName):
-        print('Update Watchface/Firmware')
+        self._log.info('Update Watchface/Firmware')
         svc = self.getServiceByUUID(UUIDS.SERVICE_DFU_FIRMWARE)
         char = svc.getCharacteristics(UUIDS.CHARACTERISTIC_DFU_FIRMWARE)[0]
         char_write = svc.getCharacteristics(UUIDS.CHARACTERISTIC_DFU_FIRMWARE_WRITE)[0]
@@ -462,7 +461,7 @@ class miband(Peripheral):
         crc=0xFFFF
         with open(fileName,"rb") as f:
             crc = zlib.crc32(f.read())
-        print('CRC32 Value is-->', crc)
+        self._log.info('CRC32 Value is-->', crc)
         # input('Press Enter to Continue')
         payload = b'\x01\x08'+struct.pack("<I",fileSize)[:-1]+b'\x00'+struct.pack("<I",crc)
         char.write(payload,withResponse=True)
@@ -472,7 +471,7 @@ class miband(Peripheral):
             while True:
                 c = f.read(20) #takes 20 bytes 
                 if not c:
-                    print ("Bytes written successfully. Wait till sync finishes")
+                    self._log.info ("Bytes written successfully. Wait till sync finishes")
                     break
                 char_write.write(c)
         # # after update is done send these values
@@ -483,7 +482,7 @@ class miband(Peripheral):
         if extension.lower() == "fw":
             self.waitForNotifications(0.5)
             char.write(b'\x05', withResponse=True)
-        print('Update Complete')
+        self._log.info('Update Complete')
         input('Press Enter to Continue')
 
     def get_heart_rate_one_time(self):
@@ -553,7 +552,7 @@ class miband(Peripheral):
         if not self.activity_notif_enabled:
             self._auth_previews_data_notif(True)
             self.waitForNotifications(0.1)
-        print(f"start_get_previews_data({start_timestamp})...")
+        self._log.debug(f"start_get_previews_data({start_timestamp})...")
         year = struct.pack("<H", start_timestamp.year)
         month = struct.pack("b", start_timestamp.month)
         day = struct.pack("b", start_timestamp.day)
@@ -562,7 +561,6 @@ class miband(Peripheral):
         ts = year + month + day + hour + minute
         char = self.svc_1.getCharacteristics(UUIDS.CHARACTERISTIC_CURRENT_TIME)[0]
         utc_offset = char.read()[9:11]
-        print(f"  >uct_offset={utc_offset}")
         trigger = b'\x01\x01' + ts + utc_offset
         self._char_fetch.write(trigger, False)
         self.active = True

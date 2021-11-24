@@ -13,9 +13,9 @@ from datetime  import datetime, timedelta
 from bluepy    import btle
 
 # logging initialization 
-logging.basicConfig(format='%(asctime)-15s %(name)s (%(levelname)s) > %(message)s')
+logging.basicConfig(format='%(asctime)-15s %(name)s (%(levelname)s) > %(message)s',
+                    level=os.environ.get('LOGLEVEL', 'INFO').upper())
 logger = logging.getLogger("miband_api")
-logger.setLevel(logging.INFO)
 
 if not (os.getenv("SLEEP_FOREVER","False") in [ "0", "False", "false", "FALSE" ]) : 
     logger.warning("Environment variable SLEEP_FOREVER is set, so this service will sleep forever.")
@@ -123,8 +123,7 @@ def connect(mac_address: str,authentication_key:str):
     while not connected:
         try:
             band = miband(mac_address, 
-                        bytes.fromhex(authentication_key), 
-                        debug=True)
+                        bytes.fromhex(authentication_key))
             connected = band.initialize()    
             # set callbacks
             band.setMusicCallback(cb_music_play,     cb_music_pause,    cb_music_forward,

@@ -222,10 +222,10 @@ if __name__ == "__main__":
     while not success:
         try:
             if (AUTH_KEY):
-                band = miband(MAC_ADDR, AUTH_KEY, debug=True)
+                band = miband(MAC_ADDR, AUTH_KEY)
                 success = band.initialize()
             else:
-                band = miband(MAC_ADDR, debug=True)
+                band = miband(MAC_ADDR)
                 success = True
             break
         except BTLEDisconnectError:
