@@ -67,7 +67,7 @@ class Delegate(DefaultDelegate):
                 self._log.debug("  > Fetch data from {}-{}-{} {}:{}".format(year, month, day, hour, minute))
                 self.pkg = 0 #reset the packing index
                 self.device._char_fetch.write(b'\x02', False)
-            elif data[:3] == b'\x10\x02\x01':
+            elif (data[:3] == b'\x10\x02\x01') or (data[:3] == b'\x10\x01\x02'):
                 if self.device.last_timestamp > self.device.end_timestamp - timedelta(minutes=1):
                     self._log.debug("  > Finished fetching")
                     return
@@ -75,7 +75,6 @@ class Delegate(DefaultDelegate):
                 time.sleep(1)
                 t = self.device.last_timestamp + timedelta(minutes=1)
                 self.device.start_get_previews_data(t)
-
             elif data[:3] == b'\x10\x02\x04':
                 self._log.debug("  > No more activity fetch possible")
                 return
