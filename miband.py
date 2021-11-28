@@ -1,6 +1,6 @@
 import sys,os,time
 import logging
-from bluepy.btle import Peripheral, DefaultDelegate, ADDR_TYPE_RANDOM,ADDR_TYPE_PUBLIC, BTLEException
+from bluepy.btle import Peripheral, DefaultDelegate, ADDR_TYPE_RANDOM,ADDR_TYPE_PUBLIC, BTLEException, BTLEInternalError
 from constants import UUIDS, AUTH_STATES, ALERT_TYPES, QUEUE_TYPES, MUSICSTATE
 import struct
 from datetime import datetime, timedelta
@@ -69,14 +69,14 @@ class Delegate(DefaultDelegate):
                 self.device._char_fetch.write(b'\x02', False)
             elif (data[:3] == b'\x10\x02\x01') or (data[:3] == b'\x10\x01\x02'):
                 if self.device.last_timestamp > self.device.end_timestamp - timedelta(minutes=1):
-                    self._log.debug("  > Finished fetching")
+                    self._log.debug(f"  > [{str(data)}] Finished fetching")
                     return
-                self._log.debug("  > Trigger more communication")
+                self._log.debug(f"  > [{str(data)}] Trigger more communication")
                 time.sleep(1)
                 t = self.device.last_timestamp + timedelta(minutes=1)
                 self.device.start_get_previews_data(t)
             elif data[:3] == b'\x10\x02\x04':
-                self._log.debug("  > No more activity fetch possible")
+                self._log.debug(f"  > [{str(data)}] No more activity fetch possible")
                 return
             else:
                 self._log.debug("  > Unexpected data on handle " + str(hnd) + ": " + str(data))
@@ -559,10 +559,15 @@ class miband(Peripheral):
         minute = struct.pack("b", start_timestamp.minute)
         ts = year + month + day + hour + minute
         char = self.svc_1.getCharacteristics(UUIDS.CHARACTERISTIC_CURRENT_TIME)[0]
-        utc_offset = char.read()[9:11]
-        trigger = b'\x01\x01' + ts + utc_offset
-        self._char_fetch.write(trigger, False)
-        self.active = True
+        try:
+            utc_offset = char.read()[9:11]
+            trigger = b'\x01\x01' + ts + utc_offset
+            self._char_fetch.write(trigger, False)
+            self.active = True
+        except BTLEInternalError as error:
+            self._log.error(f"BTLEInternalError in start_get_previews_data({start_timestamp}): {format(error)}")
+            self._log.error(f"Exitting...")
+            sys.exit()
     
     def get_activity_betwn_intervals(self,start_timestamp, end_timestamp, callback ):
         self.end_timestamp = end_timestamp
