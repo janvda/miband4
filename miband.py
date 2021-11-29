@@ -567,7 +567,7 @@ class miband(Peripheral):
         except BTLEInternalError as error:
             self._log.error(f"BTLEInternalError in start_get_previews_data({start_timestamp}): {format(error)}")
             self._log.error(f"Exitting...")
-            sys.exit()
+            os._exit(1)
     
     def get_activity_betwn_intervals(self,start_timestamp, end_timestamp, callback ):
         self.end_timestamp = end_timestamp
