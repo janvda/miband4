@@ -123,7 +123,8 @@ def connect(mac_address: str,authentication_key:str):
     while not connected:
         try:
             band = miband(mac_address, 
-                        bytes.fromhex(authentication_key))
+                        bytes.fromhex(authentication_key),
+                        miband5 = os.getenv("MIBAND5","False") in [ "0", "False", "false", "FALSE" ])
             connected = band.initialize()    
             # set callbacks
             band.setMusicCallback(cb_music_play,     cb_music_pause,    cb_music_forward,

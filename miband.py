@@ -26,6 +26,10 @@ class Delegate(DefaultDelegate):
         self.device = device
         self.pkg = 0
         self._log = device._log
+        # the activity data is either represented by 4 bytes or by 8 bytes where the last 4 bytes can be ignored.
+        self.activity_record_size = 8 if device.miband5 else 4
+        self.activity_delta_minutes = 0
+        self._log.info(f"Delegate created with activity_record_size = {self.activity_record_size}")
 
     def handleNotification(self, hnd, data):
         if hnd == self.device._char_auth.getHandle():
@@ -66,6 +70,7 @@ class Delegate(DefaultDelegate):
                 self.device.first_timestamp = datetime(year, month, day, hour, minute)
                 self._log.debug("  > Fetch data from {}-{}-{} {}:{}".format(year, month, day, hour, minute))
                 self.pkg = 0 #reset the packing index
+                self.activity_delta_minutes = 0 #reset the index 
                 self.device._char_fetch.write(b'\x02', False)
             elif (data[:3] == b'\x10\x02\x01') or (data[:3] == b'\x10\x01\x02'):
                 if self.device.last_timestamp > self.device.end_timestamp - timedelta(minutes=1):
@@ -83,12 +88,10 @@ class Delegate(DefaultDelegate):
                 return
         elif hnd == self.device._char_activity.getHandle():
             self._log.debug(f"_char_activity.getHandle(): {len(data)} bytes received, processing them ...")
-            if len(data) % 4 == 1:
-                self.pkg += 1
-                i = 1
+            if len(data) % self.activity_record_size == 1:
+                i = 1 # skip first byte as it is the index
                 while i < len(data):
-                    index = ( int(self.pkg) -1 ) * 4 + (i - 1) / 4
-                    timestamp = self.device.first_timestamp + timedelta(minutes= index )
+                    timestamp = self.device.first_timestamp + timedelta(minutes= self.activity_delta_minutes )
                     self.device.last_timestamp = timestamp
                     category = struct.unpack("<B", data[i:i + 1])[0]
                     intensity = struct.unpack("B", data[i + 1:i + 2])[0]
@@ -98,7 +101,8 @@ class Delegate(DefaultDelegate):
                         self.device.activity_callback(timestamp,category,intensity,steps,heart_rate)
                     else:
                         self._log.debug(f"  >ignoring received data as timestamp={timestamp} >= end_timestamp={self.device.end_timestamp}")
-                    i += 4
+                    i += self.activity_record_size
+                    self.activity_delta_minutes +=1
 
         #music controls & lost device
         elif(hnd == 74):
@@ -140,13 +144,14 @@ class Delegate(DefaultDelegate):
 class miband(Peripheral):
     _send_rnd_cmd = struct.pack('<2s', b'\x02\x00')
     _send_enc_key = struct.pack('<2s', b'\x03\x00')
-    def __init__(self, mac_address,key=None, timeout=0.5):
+    def __init__(self, mac_address,key=None, timeout=0.5, miband5=False):
         FORMAT = '%(asctime)-15s %(name)s (%(levelname)s) > %(message)s'
         logging.basicConfig(format=FORMAT,
                             level=os.environ.get('LOGLEVEL', 'INFO').upper())
         self._log = logging.getLogger(self.__class__.__name__)
         #self._log.setLevel(log_level)
 
+        self.miband5 = miband5
         self._log.info('Connecting to ' + mac_address)
         Peripheral.__init__(self, mac_address, addrType=ADDR_TYPE_PUBLIC)
         self._log.info('Connected')

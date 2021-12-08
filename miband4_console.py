@@ -18,6 +18,7 @@ from miband import miband
 parser = argparse.ArgumentParser()
 parser.add_argument('-m', '--mac', required=False, help='Set mac address of the device')
 parser.add_argument('-k', '--authkey', required=False, help='Set Auth Key for the device')
+parser.add_argument('-5', '--miband5', required=False, action='store_true', help='must be set for miband5 device to get proper activity data')
 args = parser.parse_args()
 
 # Try to obtain MAC from the file
@@ -136,8 +137,6 @@ def update_watchface():
     path = input("Enter the path of the watchface .bin file :")
     band.dfuUpdate(path)
 
-
-
 # Needs Auths
 def set_time():
     now = datetime.now()
@@ -222,7 +221,7 @@ if __name__ == "__main__":
     while not success:
         try:
             if (AUTH_KEY):
-                band = miband(MAC_ADDR, AUTH_KEY)
+                band = miband(MAC_ADDR, AUTH_KEY, miband5 = args.miband5)
                 success = band.initialize()
             else:
                 band = miband(MAC_ADDR)
