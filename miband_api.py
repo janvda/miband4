@@ -24,12 +24,23 @@ if not (os.getenv("SLEEP_FOREVER","False") in [ "0", "False", "false", "FALSE" ]
         time.sleep(3600)
 
 # create decorator function as specified by https://stackoverflow.com/a/64656733/6762442
+# It will also exit the service when exception:
+#   bluepy.btle.BTLEInternalError: Helper not started (did you call connect()?)
+# is raised.
 def return_404_if_not_connected(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         global connected
         if connected:
-            return func(*args, **kwargs)
+            try :
+                rc = func(*args, **kwargs)
+            except BTLEInternalError as error:
+                error_str = format(error)
+                logger.exception(error_str)          
+                if "Helper not started (did you call connect()?)" in error_str:
+                    logger.error("Inconsistent state, exiting service ...")
+                    exit()
+            return rc
         else:
             raise HTTPException(status_code=404, detail="Not connected to miband device - you need to (re)connect first before using this operation.")
     return wrapper
