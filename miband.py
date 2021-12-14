@@ -105,7 +105,7 @@ class Delegate(DefaultDelegate):
                     self.activity_delta_minutes +=1
 
         #music controls & lost device
-        elif(hnd == 74):
+        elif(hnd == self.device._char_music_notif.getHandle()):
             cmd = data[1:][0] if len(data[1:]) > 0 else None
             if data[0] == 0x08:
                 # Start ringing
