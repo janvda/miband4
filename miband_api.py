@@ -34,7 +34,7 @@ def return_404_if_not_connected(func):
         if connected:
             try :
                 rc = func(*args, **kwargs)
-            except BTLEInternalError as error:
+            except btle.BTLEInternalError as error:
                 error_str = format(error)
                 logger.exception(error_str)          
                 if "Helper not started (did you call connect()?)" in error_str:
