@@ -39,7 +39,7 @@ def return_404_if_not_connected(func):
                 logger.exception(error_str)          
                 if "Helper not started (did you call connect()?)" in error_str:
                     logger.error("Inconsistent state, exiting service ...")
-                    exit()
+                    os._exit(2)
             return rc
         else:
             raise HTTPException(status_code=404, detail="Not connected to miband device - you need to (re)connect first before using this operation.")
