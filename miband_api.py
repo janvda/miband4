@@ -208,6 +208,14 @@ def get_current_time():
 @protect_by_miband_lock
 def get_heart_rate():
     return band.get_heart_rate_one_time()
+
+@app.post("/set_time")
+@return_404_if_not_connected
+@protect_by_miband_lock
+def post_message():
+    now = datetime.now()
+    band.set_current_time(now)
+    return band.get_current_time()
  
 @app.post("/message")
 @return_404_if_not_connected
