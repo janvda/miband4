@@ -1,12 +1,16 @@
 
 ![Requirements](https://img.shields.io/badge/Python-3.6-lightgrey)
-![Commit](https://img.shields.io/github/last-commit/satcar77/miband4) 
+![Commit](https://img.shields.io/github/last-commit/janvda/miband4) 
 ![License](http://img.shields.io/:license-mit-blue.svg?style=flat-square)
 
-# MIBAND 4 - Python Library
+# MIBAND 4 & 5 - Python Service
 
-> Library to interact with Xiaomi MiBand4. 
-> Only works on linux.
+This repository is a modified and extended version of the repository [satcar77/miband4](https://github.com/satcar77/miband4/blob/master/README.md)
+
+It allows to interact with Xiaomi MiBand4 and MiBand5
+
+# Documentation below needs to be cleaned up !
+
 ![demo](screen/1.png)
 
 ## Updates(3/1/2021)
