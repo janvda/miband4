@@ -5,9 +5,38 @@
 
 # MIBAND 4 & 5 - Python Service
 
-This repository is a modified and extended version of the repository [satcar77/miband4](https://github.com/satcar77/miband4/blob/master/README.md)
+This repository is a modified and extended version of the [satcar77/miband4 repository](https://github.com/satcar77/miband4/blob/master/README.md).  It provides following extensions with respect to this repository:
 
-It allows to interact with Xiaomi MiBand4 and MiBand5
+1. better support for MiBand5
+2. provides an API service ([miband_api.py](https://github.com/janvda/miband4/blob/master/miband_api.py) - this service doesn't exist in parent repository) which allows to interact with the miband
+
+
+## miband-api.py
+
+This python program provides an API service that allows to interact with a specific miband 4 or miband 5 device.
+
+It uses the [FastAPI](https://fastapi.tiangolo.com/) framework to wrap the methods specified in [miband.py](https://github.com/janvda/miband4/blob/master/miband.py).  These API methods are exposed at URL `http://<API_HOST>:<API_PORT>` (see Environment Variables).  This API also provides its documentation at same URL `http://<API_HOST>:<API_PORT>` (more precisely the subfolders `/docs` allows also to test the API and the subfolder `/redoc` provides FastAPI specification powered by ReDoc)
+
+The asynchronous feedback coming from the miband device is send to a configurable MQTT broker.
+
+### Environment Variables
+
+This services makes use of the following environment variables:
+
+| env | default value | description |
+| -- | -- | -- |
+| MIBAND_MAC | - | Bluetooth mac address of the miband device we want to interact with. |
+| MIBAND_AUTH_KEY  | - | The authentication key (see below) that is needed for most interactions. | 
+| API_HOST | `0.0.0.0`  | listening socket for the REST API will be bound to this host|
+| API_PORT | `8001` | Port for the REST API. |
+| MQTT_CLIENT_NAME | `miband-api-service` |  |
+| MQTT_SERVER | `127.0.0.1` | hostname of the MQTT broker|
+| MQTT_PORT | `1883`| port of the MQTT broker |
+| MQTT_ALIVE | `60` | |
+| MQTT_BIND_ADDRESS | - | |
+| MQTT_TOPIC | `/miband-api` | MQTT topic prefix used by API for publishing messages. |
+| LOGLEVEL | - | E.g. `INFO`|
+| TZ | - | The timezone. E.g. `Europe/Paris`, `UTC`, ... |
 
 # Documentation below needs to be cleaned up !
 
