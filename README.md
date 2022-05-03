@@ -12,9 +12,9 @@ This repository is a modified and extended version of the [satcar77/miband4 repo
 
 ## miband-api.py
 
-This python program provides an API service that allows to interact with a specific miband 4 or miband 5 device.
+This python program provides an API service that allows to interact with a specific [Xiaomi Mi Smart Band 4](https://en.wikipedia.org/wiki/Xiaomi_Mi_Smart_Band_4) or [Xiaomi Mi Smart Band 5](https://en.wikipedia.org/wiki/Xiaomi_Mi_Smart_Band_5) device.
 
-It uses the [FastAPI](https://fastapi.tiangolo.com/) framework to wrap the methods specified in [miband.py](https://github.com/janvda/miband4/blob/master/miband.py).  These API methods are exposed at URL `http://<exposed api host>:<API_PORT>` (see Environment Variables).  This API also provides its documentation at same URL (e.g. [http://nuc1:8200](http://nuc1:8200) - assuming the API is exposed at host `nuc1` and `API_PORT` = `8200` ).  More precisely the documentation can be found at following subfolders of the URL:
+It uses the [FastAPI](https://fastapi.tiangolo.com/) framework to wrap the methods specified in [miband.py](https://github.com/janvda/miband4/blob/master/miband.py).  These API methods are exposed at URL `http://<exposed api host>:<API_PORT>` (see Environment Variables).  This API also provides its documentation at same URL (e.g. [http://nuc1:8200](http://nuc1:8200) - assuming the API is exposed at host `nuc1` and `API_PORT` = `8200` ).  More precisely the documentation can be found at following subfolders of this URL:
 
 * `/docs` which besides the API specification also allows to test the API
 * `/redoc` provides FastAPI specification powered by ReDoc.
