@@ -56,6 +56,8 @@ This services makes use of the following environment variables:
 
 ### Fetching Activity data
 
+see also [README.miband4.gatt.md](README.miband4.gatt.md)
+
 Fetching activity data is actually happening by method `start_get_previews_data(start_timestamp)` which triggers the activity retrieval by following write command.
 
 ```
