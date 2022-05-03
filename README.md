@@ -62,6 +62,8 @@ Fetching activity data is actually happening by method `start_get_previews_data(
 ```java
 trigger = b'\x01\x01' + ts + utc_offset
 self._char_fetch.write(trigger, False)
+// self._char_fetch = self.getCharacteristics(uuid=UUIDS.CHARACTERISTIC_FETCH)[0] 
+// CHARACTERISTIC_FETCH = "00000004-0000-3512-2118-0009af100700"
 ```
 
 The following notifications are then received from miband:
@@ -69,9 +71,10 @@ The following notifications are then received from miband:
 1. `hnd == self.device._char_fetch.getHandle()` and `data[:3] == b'\x10\x01\x01'`
     1. Log start timestamp. E.g. `miband (DEBUG) >   > Fetch data from 2022-5-3 11:51`
     2. `self.device._char_fetch.write(b'\x02', False)` (I don't know why this is needed)
-2. several `hnd == self.device._char_activity.getHandle()`
-    1. splits received data in activity records and for each activity record:
-       1. call the callback which also logs the activity data. E.g. `miband_api (INFO) > {"timestamp_ms": 1651571460000, "timestamp_local": "2022-05-03 11:51:00", "category": 96, "intensity": 21, "steps": 0, "heart_rate": 255}`
+2. several `hnd == self.device._char_activity.getHandle()`  
+where  `self.device._char_activity` = `self.getCharacteristics(uuid=UUIDS.CHARACTERISTIC_ACTIVITY_DATA)[0]` and `CHARACTERISTIC_ACTIVITY_DATA = "00000005-0000-3512-2118-0009af100700"`
+    1. this handle splits the received data in activity records and for each activity record:
+       1. calls the registered callback which also logs the activity data. E.g. `miband_api (INFO) > {"timestamp_ms": 1651571460000, "timestamp_local": "2022-05-03 11:51:00", "category": 96, "intensity": 21, "steps": 0, "heart_rate": 255}`
 3. Instead of 2 we get sometimes
 
 ```text
