@@ -51,7 +51,6 @@ This services makes use of the following environment variables:
 | TZ | - | The timezone. E.g. `Europe/Paris`, `UTC`, ... |
 | SLEEPFOREVER | False | When set to `True` or `1` the python service will just *sleep* forever.  This is only set when the python service is running in a docker container and you want to test the configuration by attaching a shell to the docker container. |
 
-
 ## miband.py
 
 ### Fetching Activity data
@@ -60,7 +59,7 @@ see also [README.miband4.gatt.md](README.miband4.gatt.md)
 
 Fetching activity data is actually happening by method `start_get_previews_data(start_timestamp)` which triggers the activity retrieval by following write command.
 
-```
+```java
 trigger = b'\x01\x01' + ts + utc_offset
 self._char_fetch.write(trigger, False)
 ```
@@ -75,7 +74,7 @@ The following notifications are then received from miband:
        1. call the callback which also logs the activity data. E.g. `miband_api (INFO) > {"timestamp_ms": 1651571460000, "timestamp_local": "2022-05-03 11:51:00", "category": 96, "intensity": 21, "steps": 0, "heart_rate": 255}`
 3. Instead of 2 we get sometimes
 
-```
+```text
 2022-05-03 13:43:11,692 miband (DEBUG) > _char_fetch.getHandle(): 3 bytes received, processing them ...
 2022-05-03 13:43:11,693 miband (DEBUG) >   > [b'\x10\x01\x02'] Trigger more communication
 2022-05-03 13:43:12,694 miband (DEBUG) > start_get_previews_data(2022-05-03 13:34:00)...
@@ -94,7 +93,90 @@ The following notifications are then received from miband:
 2022-05-03 13:43:16,418 miband (DEBUG) >   > [b'\x10\x01\x02'] Trigger more communication
 ```
 
+### Comparison of fetching activity by Gadget Bridge
 
+I have compared it with repository [Freeyourgadge/Gadgetbridge](https://github.com/Freeyourgadget/Gadgetbridge).
+
+The java class [FetchActivityOperation.java](https://github.com/Freeyourgadget/Gadgetbridge/blob/2c12b1bf731813ce574adfada47c404dede5b520/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/miband/operations/FetchActivityOperation.java) describes the logic of fetching the activity data.
+
+1/ So the retrieval is initiated by `doPerfom()` method which does:
+
+```java
+builder.write(getCharacteristic(MiBandService.UUID_CHARACTERISTIC_CONTROL_POINT), fetch)
+```
+
+where
+
+* `UUID_CHARACTERISTIC_CONTROL_POINT` = `UUID.fromString(String.format(BASE_UUID, "FF05"))`
+* `fetch` = `MiBandService.COMMAND_FETCH_DATA` = `0x6`
+
+2/ The activity data is received by the `onCharacteristicChanged()` method which does:
+
+```java
+if (MiBandService.UUID_CHARACTERISTIC_ACTIVITY_DATA.equals(characteristicUUID)) {
+            handleActivityNotif(characteristic.getValue());
+...
+```
+
+where:
+
+* `UUID_CHARACTERISTIC_ACTIVITY_DATA` =  `UUID.fromString(String.format(BASE_UUID, "FF07"))`
+  
+3/ once the last chunk of activity data is received it writes an acknowledgement
+
+```java
+...
+if (activityStruct.isBlockFinished()) {
+    sendAckDataTransfer(activityStruct.activityDataTimestampToAck, activityStruct.activityDataUntilNextHeader);
+            ...
+}
+```
+
+and `sendAckDataTransfer()` does:
+
+```java
+...
+byte[] ackChecksum = new byte[]{
+    (byte) (bytesTransferred & 0xff),
+    (byte) (0xff & (bytesTransferred >> 8))
+};
+if (prefs.getBoolean(MiBandConst.PREF_MIBAND_DONT_ACK_TRANSFER, false)) {
+    ackChecksum = new byte[]{
+        (byte) (~bytesTransferred & 0xff),
+        (byte) (0xff & (~bytesTransferred >> 8))
+    };
+}
+byte[] ack = new byte[]{
+    MiBandService.COMMAND_CONFIRM_ACTIVITY_DATA_TRANSFER_COMPLETE,
+    ackTime[0],
+    ackTime[1],
+    ackTime[2],
+    ackTime[3],
+    ackTime[4],
+    ackTime[5],
+    ackChecksum[0],
+    ackChecksum[1]
+};
+try {
+    TransactionBuilder builder = performInitialized("send acknowledge");
+    builder.write(getCharacteristic(MiBandService.UUID_CHARACTERISTIC_CONTROL_POINT), ack);
+    ...
+    //The last data chunk sent by the miband has always length 0.
+    //When we ack this chunk, the transfer is done.
+    if (getDevice().isBusy() && bytesTransferred == 0) {
+        /if we are not clearing miband's data, we have to stop the sync
+        if (prefs.getBoolean(MiBandConst.PREF_MIBAND_DONT_ACK_TRANSFER, false)) {
+            builder = performInitialized("send acknowledge");
+            builder.write(getCharacteristic(
+                MiBandService.UUID_CHARACTERISTIC_CONTROL_POINT), new byte[]
+                {MiBandService.COMMAND_STOP_SYNC_DATA});
+```
+
+where
+
+* `COMMAND_CONFIRM_ACTIVITY_DATA_TRANSFER_COMPLETE` = `0xa`
+* `PREF_MIBAND_DONT_ACK_TRANSFER` = environment variable ?
+* `COMMAND_STOP_SYNC_DATA` = `0x11`
 
 # Documentation below needs to be cleaned up
 
