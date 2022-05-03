@@ -47,9 +47,52 @@ This services makes use of the following environment variables:
 | MQTT_ALIVE | `60` | |
 | MQTT_BIND_ADDRESS | - | |
 | MQTT_TOPIC | `/miband-api` | MQTT topic prefix used by API for publishing messages. |
-| LOGLEVEL | - | E.g. `INFO`|
+| LOGLEVEL | - | E.g. `INFO`, `DEBUG`, ...|
 | TZ | - | The timezone. E.g. `Europe/Paris`, `UTC`, ... |
 | SLEEPFOREVER | False | When set to `True` or `1` the python service will just *sleep* forever.  This is only set when the python service is running in a docker container and you want to test the configuration by attaching a shell to the docker container. |
+
+
+## miband.py
+
+### Fetching Activity data
+
+Fetching activity data is actually happening by method `start_get_previews_data(start_timestamp)` which triggers the activity retrieval by following write command.
+
+```
+trigger = b'\x01\x01' + ts + utc_offset
+self._char_fetch.write(trigger, False)
+```
+
+The following notifications are then received from miband:
+
+1. `hnd == self.device._char_fetch.getHandle()` and `data[:3] == b'\x10\x01\x01'`
+    1. Log start timestamp. E.g. `miband (DEBUG) >   > Fetch data from 2022-5-3 11:51`
+    2. `self.device._char_fetch.write(b'\x02', False)` (I don't know why this is needed)
+2. several `hnd == self.device._char_activity.getHandle()`
+    1. splits received data in activity records and for each activity record:
+       1. call the callback which also logs the activity data. E.g. `miband_api (INFO) > {"timestamp_ms": 1651571460000, "timestamp_local": "2022-05-03 11:51:00", "category": 96, "intensity": 21, "steps": 0, "heart_rate": 255}`
+3. Instead of 2 we get sometimes
+
+```
+2022-05-03 13:43:11,692 miband (DEBUG) > _char_fetch.getHandle(): 3 bytes received, processing them ...
+2022-05-03 13:43:11,693 miband (DEBUG) >   > [b'\x10\x01\x02'] Trigger more communication
+2022-05-03 13:43:12,694 miband (DEBUG) > start_get_previews_data(2022-05-03 13:34:00)...
+2022-05-03 13:43:12,695 miband (DEBUG) > _char_fetch.getHandle(): 3 bytes received, processing them ...
+2022-05-03 13:43:12,696 miband (DEBUG) >   > [b'\x10\x02\x04'] No more activity fetch possible
+2022-05-03 13:43:12,862 miband (DEBUG) > _char_fetch.getHandle(): 3 bytes received, processing them ...
+2022-05-03 13:43:12,864 miband (DEBUG) >   > [b'\x10\x01\x02'] Trigger more communication
+2022-05-03 13:43:13,865 miband (DEBUG) > start_get_previews_data(2022-05-03 13:34:00)...
+2022-05-03 13:43:14,032 miband (DEBUG) > _char_fetch.getHandle(): 3 bytes received, processing them ...
+2022-05-03 13:43:14,033 miband (DEBUG) >   > [b'\x10\x01\x02'] Trigger more communication
+2022-05-03 13:43:15,034 miband (DEBUG) > start_get_previews_data(2022-05-03 13:34:00)...
+2022-05-03 13:43:15,247 miband (DEBUG) > _char_fetch.getHandle(): 3 bytes received, processing them ...
+2022-05-03 13:43:15,248 miband (DEBUG) >   > [b'\x10\x01\x02'] Trigger more communication
+2022-05-03 13:43:16,249 miband (DEBUG) > start_get_previews_data(2022-05-03 13:34:00)...
+2022-05-03 13:43:16,417 miband (DEBUG) > _char_fetch.getHandle(): 3 bytes received, processing them ...
+2022-05-03 13:43:16,418 miband (DEBUG) >   > [b'\x10\x01\x02'] Trigger more communication
+```
+
+
 
 # Documentation below needs to be cleaned up
 
