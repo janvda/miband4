@@ -164,7 +164,7 @@ try {
     //The last data chunk sent by the miband has always length 0.
     //When we ack this chunk, the transfer is done.
     if (getDevice().isBusy() && bytesTransferred == 0) {
-        /if we are not clearing miband's data, we have to stop the sync
+        // if we are not clearing miband's data, we have to stop the sync
         if (prefs.getBoolean(MiBandConst.PREF_MIBAND_DONT_ACK_TRANSFER, false)) {
             builder = performInitialized("send acknowledge");
             builder.write(getCharacteristic(
