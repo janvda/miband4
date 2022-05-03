@@ -21,12 +21,22 @@ It uses the [FastAPI](https://fastapi.tiangolo.com/) framework to wrap the metho
 
 The asynchronous feedback coming from the miband device is send to a configurable MQTT broker.
 
+### Design
+
+High level structure of this python service
+
+1. Connect to MQTT broker (asynchronous) and also start the MQTT loop
+2. Connect to miband device in a separate thread
+    1. When connected start the infinite loop (`post_wait_for_notifications()`) to receive asynchronous messages from miband
+3. Start the FastAPI loop to handle incoming REST API calls.
+
 ### Environment Variables
 
 This services makes use of the following environment variables:
 
 | env | default value | description |
 | -- | -- | -- |
+| MIBAND5 | False | Should be set if the device is a miband5 device, otherwise the device is considered a miband4 device. |
 | MIBAND_MAC | - | Bluetooth mac address of the miband device we want to interact with. |
 | MIBAND_AUTH_KEY  | - | The authentication key (see below) that is needed for most interactions. |
 | API_HOST | `0.0.0.0`  | listening socket for the REST API will be bound to this host. |
@@ -39,6 +49,7 @@ This services makes use of the following environment variables:
 | MQTT_TOPIC | `/miband-api` | MQTT topic prefix used by API for publishing messages. |
 | LOGLEVEL | - | E.g. `INFO`|
 | TZ | - | The timezone. E.g. `Europe/Paris`, `UTC`, ... |
+| SLEEPFOREVER | False | When set to `True` or `1` the python service will just *sleep* forever.  This is only set when the python service is running in a docker container and you want to test the configuration by attaching a shell to the docker container. |
 
 # Documentation below needs to be cleaned up
 
