@@ -4,7 +4,7 @@ from bluepy.btle import Peripheral, DefaultDelegate, ADDR_TYPE_RANDOM,ADDR_TYPE_
 from constants import UUIDS, AUTH_STATES, ALERT_TYPES, QUEUE_TYPES, MUSICSTATE
 import struct
 from datetime import datetime, timedelta
-from Crypto.Cipher import AES
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from datetime import datetime
 try:
     import zlib
@@ -274,8 +274,11 @@ class miband(Peripheral):
         self.waitForNotifications(self.timeout)
 
     def _encrypt(self, message):
-        aes = AES.new(self.auth_key, AES.MODE_ECB)
-        return aes.encrypt(message)
+        encryptor = Cipher(
+            algorithms.AES(self.auth_key),
+            modes.ECB(),
+        ).encryptor()
+        return encryptor.update(message) + encryptor.finalize()
 
     def _get_from_queue(self, _type):
         try:
